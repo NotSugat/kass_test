@@ -10,7 +10,7 @@ use std::{
     io::{stdout, Result, Write},
     path::Path,
 };
-use text_editor::*;
+use text_editor::Position;
 
 use super::mode::*;
 use super::statusbar::*;
@@ -73,7 +73,7 @@ impl Kass {
             position_x: 0,
             position_y: 0,
 
-            cursor: Position::default(),
+            cursor: Position::new(3, 0)?,
 
             number_display: false,
             terminal_height: height,
@@ -105,7 +105,6 @@ impl Kass {
                 if !self.mode_changed {
                     match self.current_mode {
                         Mode::Insert => self.handle_insert_mode()?,
-                        Mode::Normal => self.handle_normal_mode()?,
                         Mode::Command => self.handle_command_mode()?,
                         _ => {}
                     }
@@ -167,7 +166,6 @@ impl Kass {
                     self.command = String::from("");
                     self.refresh_screen(0, 0, &self.text)?;
                     self.current_mode = Mode::Normal;
-                    self.mode_changed = true;
                 }
                 _ => self.mode_changed = false,
             },
@@ -175,10 +173,7 @@ impl Kass {
             _ => match self.key_event {
                 KeyEvent {
                     code: KeyCode::Esc, ..
-                } => {
-                    self.current_mode = Mode::Normal;
-                    self.mode_changed = true;
-                }
+                } => self.current_mode = Mode::Normal,
                 _ => self.mode_changed = false,
             },
         }
@@ -186,63 +181,6 @@ impl Kass {
         Ok(())
     }
 
-    fn handle_normal_mode(&mut self) -> Result<()> {
-        match self.key_event {
-            KeyEvent {
-                code: KeyCode::Char(key),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => match key {
-                'h' => self.move_cursor(MovementKey::Left),
-                'l' => self.move_cursor(MovementKey::Right),
-                'j' => self.move_cursor(MovementKey::Down),
-                'k' => self.move_cursor(MovementKey::Up),
-                _ => {}
-            },
-            KeyEvent { code, .. } => match code {
-                KeyCode::Left => self.move_cursor(MovementKey::Left),
-                KeyCode::Right => self.move_cursor(MovementKey::Right),
-                KeyCode::Down => self.move_cursor(MovementKey::Down),
-                KeyCode::Up => self.move_cursor(MovementKey::Up),
-
-                _ => {}
-            },
-        }
-        Ok(())
-    }
-
-    //cursor handler
-
-    fn move_cursor(&mut self, key: MovementKey) {
-        let bounds = self.boundary();
-        match key {
-            MovementKey::Left => self.cursor.x = self.cursor.x.saturating_sub(1),
-
-            MovementKey::Right if self.cursor.x <= bounds.x => self.cursor.x += 1,
-            MovementKey::Up => self.cursor.y = self.cursor.y.saturating_sub(1),
-            MovementKey::Down if self.cursor.y <= bounds.y => self.cursor.y += 1,
-            _ => {}
-        }
-
-        self.refresh_screen(self.cursor.x as usize, self.cursor.y as usize, &self.text)
-            .expect("not working refresh screen in move cursor function");
-    }
-
-    // terminal boundary
-
-    fn boundary(&self) -> Position {
-        // minus 2 because of the scroll bar at the right side
-        Position {
-            x: self.terminal_width as u16 - 2,
-            y: self.terminal_height as u16 - 2,
-        }
-    }
-
-    fn move_to(&self, position: Position) {
-        cursor::MoveTo(position.x, position.y);
-    }
-
-    // handle insert mode
     fn handle_insert_mode(&mut self) -> Result<()> {
         match self.key_event {
             KeyEvent {
@@ -251,12 +189,8 @@ impl Kass {
                 ..
             } => {
                 self.text.pop();
-                if self.cursor.x != 0 {
-                    self.cursor.x = self.cursor.x.saturating_sub(1);
-                } else {
-                    self.cursor.y = self.cursor.y.saturating_sub(1);
-                }
-                self.refresh_screen(self.cursor.x as usize, self.cursor.y as usize, &self.text)?;
+
+                self.refresh_screen(self.position_x, 0, &self.text)?;
             }
             KeyEvent {
                 code: KeyCode::Enter,
@@ -264,13 +198,15 @@ impl Kass {
             } => {
                 self.text.push('\n');
 
-                // if self.cursor.x > 3 {
-                //     self.cursor.x -= 1;
-                // }
-
                 self.cursor.y += 1;
-
-                self.refresh_screen(0, 0, &self.text)?;
+                if self.cursor.x > 3 {
+                    self.cursor.x -= 1;
+                }
+                self.position_y += 1;
+                execute!(
+                    stdout(),
+                    cursor::MoveTo(self.position_x as u16, self.position_y as u16)
+                )?;
             }
             _ => {
                 // print
@@ -359,7 +295,7 @@ impl Kass {
         self.statusbar.paint()?;
         execute!(
             stdout(),
-            cursor::MoveTo(0, 0),
+            cursor::MoveTo(width as u16, height as u16),
             terminal::Clear(terminal::ClearType::All),
         )?;
 
@@ -376,15 +312,16 @@ impl Kass {
         if self.number_display {
             self.line_number_display()?;
         }
-
-        execute!(stdout(), cursor::MoveTo(self.cursor.x, self.cursor.y))?;
-        print!("{} , {}", self.cursor.x, self.cursor.y);
+        self.handle_cursor()?;
         stdout().flush()?;
 
         Ok(())
     }
 
-    // Line number display
+    fn handle_cursor(&self) -> Result<()> {
+        execute!(stdout(), cursor::MoveTo(self.cursor.x, self.cursor.y))?;
+        Ok(())
+    }
 
     fn line_number_display(&self) -> Result<()> {
         for i in 0..self.terminal_height - 1 {
@@ -394,7 +331,7 @@ impl Kass {
                 .queue(Print(format!("{:3} ", i + 1)))?;
         }
 
-        // execute!(stdout(), cursor::MoveTo(self.position_x as u16, 0))?;
+        execute!(stdout(), cursor::MoveTo(self.position_x as u16, 0))?;
         stdout().flush()?;
         Ok(())
     }
