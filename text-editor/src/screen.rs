@@ -29,22 +29,30 @@ impl Screen {
         })
     }
 
-    pub fn draw_screen(&mut self, rows: &[String], rowoff: usize) -> Result<()> {
+    pub fn draw_screen(&mut self, rows: &[String], rowoff: usize, coloff: usize) -> Result<()> {
         for i in 0..(self.height - 2) {
             let row = i + rowoff;
             if row >= rows.len() {
             } else {
-                let len = rows[row].len().min(self.width);
+                let mut len = rows[row].len();
+
+                if len < coloff {
+                    continue;
+                }
+                len -= coloff;
+                let start = coloff;
+                let end = start + if len >= self.width { self.width } else { len };
+
                 stdout()
                     .queue(cursor::MoveTo(0, i as u16))?
-                    .queue(Print(rows[row][0..len].to_string()))?;
+                    .queue(Print(rows[row][start..end].to_string()))?;
             }
         }
         Ok(())
     }
 
-    pub fn move_to(&mut self, pos: &Position, rowoff: u16) -> Result<()> {
-        stdout().queue(cursor::MoveTo(pos.x, pos.y - rowoff))?;
+    pub fn move_to(&mut self, pos: &Position, rowoff: u16, coloff: u16) -> Result<()> {
+        stdout().queue(cursor::MoveTo(pos.x - coloff, pos.y - rowoff))?;
         Ok(())
     }
     // terminal boundary

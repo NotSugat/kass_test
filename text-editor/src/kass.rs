@@ -39,6 +39,7 @@ pub struct Kass {
 
     rows: Vec<String>,
     rowoff: u16,
+    coloff: u16,
 
     // cursor position
     cursor: Position,
@@ -85,6 +86,7 @@ impl Kass {
                 Vec::from(data)
             },
             rowoff: 0,
+            coloff: 0,
             cursor: Position::default(),
 
             number_display: false,
@@ -107,7 +109,8 @@ impl Kass {
                     KeyCode::Char(c) => self.character = c,
                     _ => {}
                 }
-                self.screen.move_to(&self.cursor, self.rowoff)?;
+                self.screen
+                    .move_to(&self.cursor, self.rowoff, self.coloff)?;
                 self.handle_modes()?;
 
                 if !self.mode_changed {
@@ -222,11 +225,10 @@ impl Kass {
     //cursor handler
 
     fn move_cursor(&mut self, key: MovementKey) {
-        let bounds = self.screen.boundary();
         match key {
             MovementKey::Left => self.cursor.x = self.cursor.x.saturating_sub(1),
 
-            MovementKey::Right if self.cursor.x <= bounds.x => self.cursor.x += 1,
+            MovementKey::Right => self.cursor.x += 1,
             MovementKey::Up => self.cursor.y = self.cursor.y.saturating_sub(1),
             MovementKey::Down if self.cursor.y < self.rows.len() as u16 => self.cursor.y += 1,
             _ => {}
@@ -249,6 +251,14 @@ impl Kass {
         if self.cursor.y >= self.rowoff + bounds.y {
             self.rowoff = self.cursor.y - bounds.y + 1;
         }
+        if self.cursor.x < self.coloff {
+            self.coloff = self.cursor.x;
+        }
+
+        if self.cursor.x >= self.coloff + bounds.x {
+            self.coloff = self.cursor.x - bounds.x + 1;
+        }
+
         Ok(())
     }
 
@@ -366,14 +376,15 @@ impl Kass {
 
     fn refresh_screen(&mut self) -> Result<()> {
         // self.statusbar.paint()?;
+        self.scroll()?;
         execute!(
             stdout(),
             cursor::MoveTo(0, 0),
             terminal::Clear(terminal::ClearType::All),
         )?;
 
-        self.screen.draw_screen(&self.rows, self.rowoff as usize)?;
-        self.scroll()?;
+        self.screen
+            .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
 
         // for ch in self.text.as_bytes().iter() {
         //     let character = *ch as char;
@@ -386,7 +397,8 @@ impl Kass {
         //     }
         // }
 
-        self.screen.move_to(&self.cursor, self.rowoff)?;
+        self.screen
+            .move_to(&self.cursor, self.rowoff, self.coloff)?;
         stdout().flush()?;
 
         Ok(())
