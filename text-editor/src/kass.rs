@@ -36,6 +36,7 @@ pub struct Kass {
 
     statusbar: Statusbar,
     screen: Screen,
+    mode: String,
 
     rows: Vec<String>,
     rowoff: u16,
@@ -80,6 +81,8 @@ impl Kass {
             quit_kass: false,
             filepath: String::from(filepath),
 
+            mode: String::from("Normal"),
+
             rows: if data.is_empty() {
                 Vec::new()
             } else {
@@ -96,7 +99,7 @@ impl Kass {
     }
 
     pub fn run(&mut self) -> Result<()> {
-        self.statusbar.paint()?;
+        self.statusbar.paint(self.mode.clone())?;
         self.refresh_screen()?;
 
         loop {
@@ -115,9 +118,21 @@ impl Kass {
 
                 if !self.mode_changed {
                     match self.current_mode {
-                        Mode::Insert => self.handle_insert_mode()?,
-                        Mode::Normal => self.handle_normal_mode()?,
-                        Mode::Command => self.handle_command_mode()?,
+                        Mode::Insert => {
+                            self.handle_insert_mode()?;
+                            self.mode = "Insert".to_string();
+                            self.refresh_screen()?;
+                        }
+                        Mode::Normal => {
+                            self.handle_normal_mode()?;
+                            self.mode = "Normal".to_string();
+                            self.refresh_screen()?;
+                        }
+                        Mode::Command => {
+                            self.handle_command_mode()?;
+                            self.mode = "Command".to_string();
+                            self.refresh_screen()?;
+                        }
                         _ => {}
                     }
                 }
@@ -225,6 +240,8 @@ impl Kass {
     //cursor handler
 
     fn move_cursor(&mut self, key: MovementKey) {
+        // if
+
         match key {
             MovementKey::Left => self.cursor.x = self.cursor.x.saturating_sub(1),
 
@@ -375,7 +392,6 @@ impl Kass {
     }
 
     fn refresh_screen(&mut self) -> Result<()> {
-        // self.statusbar.paint()?;
         self.scroll()?;
         execute!(
             stdout(),
@@ -383,6 +399,7 @@ impl Kass {
             terminal::Clear(terminal::ClearType::All),
         )?;
 
+        self.statusbar.paint(self.mode.clone())?;
         self.screen
             .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
 

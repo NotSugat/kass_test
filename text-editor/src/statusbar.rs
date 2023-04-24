@@ -2,7 +2,7 @@ use std::io::{stdout, Result};
 
 use crossterm::{
     cursor, queue,
-    style::{self, Stylize},
+    style::{self, Color, Print, SetForegroundColor, Stylize},
 };
 
 #[derive(Debug, Clone)]
@@ -21,14 +21,25 @@ impl Statusbar {
         })
     }
 
-    pub fn paint(&self) -> Result<()> {
-        for x in 0..self.terminal_width {
-            queue!(
-                stdout(),
-                cursor::MoveTo(x as u16, self.terminal_height as u16),
-                style::PrintStyledContent("█".magenta())
-            )?;
-        }
+    pub fn paint(&self, mode: String) -> Result<()> {
+        let styled = mode.magenta();
+        let content = String::from("analyser");
+
+        SetForegroundColor(Color::Cyan);
+
+        queue!(
+            stdout(),
+            cursor::MoveTo(2, (self.terminal_height - 2) as u16),
+            Print(styled),
+        )?;
+        queue!(
+            stdout(),
+            cursor::MoveTo(
+                (self.terminal_width - content.len()) as u16,
+                (self.terminal_height - 2) as u16
+            ),
+            Print(content),
+        )?;
 
         Ok(())
     }
