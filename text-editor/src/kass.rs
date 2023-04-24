@@ -121,17 +121,14 @@ impl Kass {
                         Mode::Insert => {
                             self.handle_insert_mode()?;
                             self.mode = "Insert".to_string();
-                            self.refresh_screen()?;
                         }
                         Mode::Normal => {
                             self.handle_normal_mode()?;
                             self.mode = "Normal".to_string();
-                            self.refresh_screen()?;
                         }
                         Mode::Command => {
                             self.handle_command_mode()?;
                             self.mode = "Command".to_string();
-                            self.refresh_screen()?;
                         }
                         _ => {}
                     }
@@ -240,16 +237,37 @@ impl Kass {
     //cursor handler
 
     fn move_cursor(&mut self, key: MovementKey) {
-        // if
+        let row_idx = if self.cursor.y as usize >= self.rows.len() {
+            None
+        } else {
+            Some(self.cursor.y)
+        };
 
         match key {
             MovementKey::Left => self.cursor.x = self.cursor.x.saturating_sub(1),
 
-            MovementKey::Right => self.cursor.x += 1,
+            MovementKey::Right => {
+                if let Some(idx) = row_idx {
+                    if self.rows[idx as usize].len() > self.cursor.x as usize {
+                        self.cursor.x += 1;
+                    }
+                }
+            }
+
             MovementKey::Up => self.cursor.y = self.cursor.y.saturating_sub(1),
             MovementKey::Down if self.cursor.y < self.rows.len() as u16 => self.cursor.y += 1,
             _ => {}
         }
+
+        // for clamping the cursor to the front of the line after the end of the previous line
+        let rowlen = if self.cursor.y as usize >= self.rows.len() {
+            0
+        } else {
+            self.rows[self.cursor.y as usize].len() as u16
+        };
+
+        // compare length of the row and cursor x position and gives min value between them
+        self.cursor.x = self.cursor.x.min(rowlen);
 
         self.refresh_screen()
             .expect("not working refresh screen in move cursor function");
@@ -399,7 +417,7 @@ impl Kass {
             terminal::Clear(terminal::ClearType::All),
         )?;
 
-        self.statusbar.paint(self.mode.clone())?;
+        // self.statusbar.paint(self.mode.clone())?;
         self.screen
             .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
 
