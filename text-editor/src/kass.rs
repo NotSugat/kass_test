@@ -1,3 +1,10 @@
+use crate::screen;
+
+use super::mode::*;
+use super::row::*;
+use super::screen::*;
+use super::statusbar::*;
+
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers},
@@ -12,9 +19,6 @@ use std::{
 };
 use text_editor::*;
 
-use super::mode::*;
-use super::statusbar::*;
-
 #[derive(Debug, Clone)]
 pub struct Kass {
     current_mode: Mode,
@@ -25,15 +29,16 @@ pub struct Kass {
 
     quit_kass: bool,
 
-    text: String,
+    // text: String,
     command: String,
 
     filepath: String,
 
     statusbar: Statusbar,
+    screen: Screen,
 
-    position_x: usize,
-    position_y: usize,
+    rows: Vec<String>,
+    rowoff: u16,
 
     // cursor position
     cursor: Position,
@@ -45,14 +50,17 @@ pub struct Kass {
 }
 
 impl Kass {
+    pub fn with_file(height: usize, width: usize, filepath: &String) -> Result<Self> {
+        let lines = std::fs::read_to_string(filepath)
+            .expect("Unable to open file")
+            .split('\n')
+            .map(|x| x.into())
+            .collect::<Vec<String>>();
+        Kass::new(&lines, height, width, filepath)
+    }
+
     // constructor
-    pub fn new(height: usize, width: usize, filepath: &String) -> Result<Kass> {
-        let mut text = String::new();
-
-        if Path::new(&filepath).exists() {
-            text = read_to_string(filepath)?;
-        }
-
+    pub fn new(data: &[String], height: usize, width: usize, filepath: &String) -> Result<Self> {
         let statusbar = Statusbar::new(String::from("Normal"), height, width)?;
 
         Ok(Kass {
@@ -65,14 +73,18 @@ impl Kass {
                 state: KeyEventState::NONE,
             },
             character: 'f',
-            text,
             statusbar,
+            screen: Screen::new()?,
             command: String::from(""),
             quit_kass: false,
             filepath: String::from(filepath),
-            position_x: 0,
-            position_y: 0,
 
+            rows: if data.is_empty() {
+                Vec::new()
+            } else {
+                Vec::from(data)
+            },
+            rowoff: 0,
             cursor: Position::default(),
 
             number_display: false,
@@ -83,11 +95,7 @@ impl Kass {
 
     pub fn run(&mut self) -> Result<()> {
         self.statusbar.paint()?;
-        if self.number_display {
-            self.refresh_screen(5, 0, &self.text)?;
-        } else {
-            self.refresh_screen(0, 0, &self.text)?;
-        }
+        self.refresh_screen()?;
 
         loop {
             if let Event::Key(event) = event::read()? {
@@ -165,7 +173,7 @@ impl Kass {
                     code: KeyCode::Esc, ..
                 } => {
                     self.command = String::from("");
-                    self.refresh_screen(0, 0, &self.text)?;
+                    self.refresh_screen()?;
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
                 }
@@ -214,32 +222,41 @@ impl Kass {
     //cursor handler
 
     fn move_cursor(&mut self, key: MovementKey) {
-        let bounds = self.boundary();
+        let bounds = self.screen.boundary();
         match key {
             MovementKey::Left => self.cursor.x = self.cursor.x.saturating_sub(1),
 
             MovementKey::Right if self.cursor.x <= bounds.x => self.cursor.x += 1,
             MovementKey::Up => self.cursor.y = self.cursor.y.saturating_sub(1),
-            MovementKey::Down if self.cursor.y <= bounds.y => self.cursor.y += 1,
+            MovementKey::Down if self.cursor.y < self.rows.len() as u16 => self.cursor.y += 1,
             _ => {}
         }
 
-        self.refresh_screen(self.cursor.x as usize, self.cursor.y as usize, &self.text)
+        self.refresh_screen()
             .expect("not working refresh screen in move cursor function");
     }
 
-    // terminal boundary
+    fn scroll(&mut self) -> Result<()> {
+        let bounds = self.screen.boundary();
+        stdout()
+            .queue(cursor::MoveTo(0, 0))?
+            .queue(Print(format!("{} {}", self.cursor.x, self.cursor.y)))?;
 
-    fn boundary(&self) -> Position {
-        // minus 2 because of the scroll bar at the right side
-        Position {
-            x: self.terminal_width as u16 - 2,
-            y: self.terminal_height as u16 - 2,
+        if self.cursor.y < self.rowoff {
+            self.rowoff = self.cursor.y;
         }
-    }
+        if self.cursor.y >= self.rowoff + bounds.y {
+            self.rowoff = self.cursor.y - bounds.y + 1;
+        }
+        Ok(())
 
-    fn move_to(&self, position: Position) {
-        cursor::MoveTo(position.x, position.y);
+        // if self.render_x < self.coloff {
+        //     self.coloff = self.render_x;
+        // }
+
+        // if self.render_x >= self.coloff + bounds.x {
+        //     self.coloff = self.render_x - bounds.x + 1;
+        // }
     }
 
     // handle insert mode
@@ -250,19 +267,19 @@ impl Kass {
                 modifiers: KeyModifiers::NONE,
                 ..
             } => {
-                self.text.pop();
+                // self.text.pop();
                 if self.cursor.x != 0 {
                     self.cursor.x = self.cursor.x.saturating_sub(1);
                 } else {
                     self.cursor.y = self.cursor.y.saturating_sub(1);
                 }
-                self.refresh_screen(self.cursor.x as usize, self.cursor.y as usize, &self.text)?;
+                self.refresh_screen()?;
             }
             KeyEvent {
                 code: KeyCode::Enter,
                 ..
             } => {
-                self.text.push('\n');
+                // self.text.push('\n');
 
                 // if self.cursor.x > 3 {
                 //     self.cursor.x -= 1;
@@ -270,12 +287,12 @@ impl Kass {
 
                 self.cursor.y += 1;
 
-                self.refresh_screen(0, 0, &self.text)?;
+                self.refresh_screen()?;
             }
             _ => {
                 // print
                 if !self.character.is_control() {
-                    self.text.push(self.character);
+                    // self.text.push(self.character);
 
                     let output = write!(stdout(), "{}", self.character);
 
@@ -308,7 +325,7 @@ impl Kass {
                 ..
             } => {
                 self.command.pop();
-                self.refresh_screen(position_x, position_y, &self.command)?;
+                self.refresh_screen()?;
             }
 
             KeyEvent {
@@ -329,14 +346,13 @@ impl Kass {
                     }
                     ":set nu" => {
                         self.number_display = true;
-                        self.position_x = 4;
                     }
 
                     _ => {}
                 }
 
                 self.command = String::from("");
-                self.refresh_screen(0, 0, &self.text)?;
+                self.refresh_screen()?;
                 self.current_mode = Mode::Normal;
             }
 
@@ -355,47 +371,31 @@ impl Kass {
         Ok(())
     }
 
-    fn refresh_screen(&self, width: usize, height: usize, text: &String) -> Result<()> {
-        self.statusbar.paint()?;
+    fn refresh_screen(&mut self) -> Result<()> {
+        // self.statusbar.paint()?;
         execute!(
             stdout(),
             cursor::MoveTo(0, 0),
             terminal::Clear(terminal::ClearType::All),
         )?;
 
-        for ch in text.as_bytes().iter() {
-            let character = *ch as char;
+        self.scroll()?;
+        self.screen.draw_screen(&self.rows)?;
 
-            if character == '\n' {
-                write!(stdout(), "{}", "\r\n")?;
-                stdout().flush()?;
-            } else {
-                write!(stdout(), "{}", character)?
-            }
-        }
-        if self.number_display {
-            self.line_number_display()?;
-        }
+        // for ch in self.text.as_bytes().iter() {
+        //     let character = *ch as char;
+
+        //     if character == '\n' {
+        //         write!(stdout(), "{}", "\r\n")?;
+        //         stdout().flush()?;
+        //     } else {
+        //         write!(stdout(), "{}", character)?
+        //     }
+        // }
 
         execute!(stdout(), cursor::MoveTo(self.cursor.x, self.cursor.y))?;
-        print!("{} , {}", self.cursor.x, self.cursor.y);
         stdout().flush()?;
 
-        Ok(())
-    }
-
-    // Line number display
-
-    fn line_number_display(&self) -> Result<()> {
-        for i in 0..self.terminal_height - 1 {
-            stdout()
-                .queue(SetAttribute(Attribute::Reset))?
-                .queue(cursor::MoveTo(0, i as u16))?
-                .queue(Print(format!("{:3} ", i + 1)))?;
-        }
-
-        // execute!(stdout(), cursor::MoveTo(self.position_x as u16, 0))?;
-        stdout().flush()?;
         Ok(())
     }
 
@@ -406,7 +406,7 @@ impl Kass {
             .create(true)
             .open(&self.filepath)?;
 
-        file.write_all(self.text.as_bytes())?;
+        // file.write_all(self.text.as_bytes())?;
 
         Ok(())
     }

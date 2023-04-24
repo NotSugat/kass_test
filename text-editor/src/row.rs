@@ -1,8 +1,8 @@
-use crate::editor_syntax::*;
 use crossterm::style::Color;
 
 const TAB_SIZE: usize = 8;
 
+#[derive(Debug, Clone)]
 pub struct Row {
     pub chars: String,
     pub render: String,
@@ -13,7 +13,6 @@ impl Row {
         let mut result = Self {
             chars,
             render: String::new(),
-            open_comment: false,
         };
 
         result.render_row();

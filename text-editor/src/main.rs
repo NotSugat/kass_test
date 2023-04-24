@@ -1,4 +1,5 @@
 use crossterm::{cursor, execute, terminal};
+use kass::Kass;
 use std::{
     env::args,
     io::{stdout, Result},
@@ -6,6 +7,8 @@ use std::{
 
 mod kass;
 mod mode;
+mod row;
+mod screen;
 mod statusbar;
 
 fn main() -> Result<()> {
@@ -33,13 +36,14 @@ fn main() -> Result<()> {
     let args: Vec<String> = args().collect();
     let mut filepath: &String = &String::from("n/a");
 
-    if args.len() > 1 {
-        filepath = &args[1];
-    }
-
     // text editor
-    let mut kass = kass::Kass::new(height, width, filepath)?;
-    kass.run()?;
+    let mut editor = if args.len() > 1 {
+        filepath = &args[1];
+        kass::Kass::with_file(height, width, filepath)?
+    } else {
+        kass::Kass::new(&[], height, width, filepath)?
+    };
+    editor.run()?;
 
     // disable raw mode
     terminal::disable_raw_mode()?;
