@@ -66,7 +66,7 @@ impl Screen {
     }
 
     // Line number display
-    fn line_number_display(&self) -> Result<()> {
+    pub fn line_number_display(&self) -> Result<()> {
         for i in 0..self.height - 1 {
             stdout()
                 .queue(SetAttribute(Attribute::Reset))?

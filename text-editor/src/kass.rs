@@ -120,15 +120,12 @@ impl Kass {
                     match self.current_mode {
                         Mode::Insert => {
                             self.handle_insert_mode()?;
-                            self.mode = "Insert".to_string();
                         }
                         Mode::Normal => {
                             self.handle_normal_mode()?;
-                            self.mode = "Normal".to_string();
                         }
                         Mode::Command => {
                             self.handle_command_mode()?;
-                            self.mode = "Command".to_string();
                         }
                         _ => {}
                     }
@@ -155,6 +152,8 @@ impl Kass {
                 } => {
                     self.current_mode = Mode::Insert;
                     self.mode_changed = true;
+                    self.mode = "Insert".to_string();
+                    self.refresh_screen()?;
                 }
                 KeyEvent {
                     code: KeyCode::Char('a'),
@@ -162,7 +161,6 @@ impl Kass {
                     ..
                 } => {
                     self.current_mode = Mode::Insert;
-                    self.mode_changed = true;
                 }
 
                 // visual mode
@@ -170,14 +168,22 @@ impl Kass {
                     code: KeyCode::Char('v'),
                     modifiers: KeyModifiers::NONE,
                     ..
-                } => self.current_mode = Mode::Visual,
+                } => {
+                    self.current_mode = Mode::Visual;
+                    self.mode = "Visual".to_string();
+                    self.refresh_screen()?;
+                }
 
                 // command mode
                 KeyEvent {
                     code: KeyCode::Char(':'),
                     modifiers: KeyModifiers::NONE,
                     ..
-                } => self.current_mode = Mode::Command,
+                } => {
+                    self.current_mode = Mode::Command;
+                    self.mode = "Command".to_string();
+                    self.refresh_screen()?;
+                }
                 _ => {
                     self.mode_changed = false;
                 }
@@ -188,9 +194,11 @@ impl Kass {
                     code: KeyCode::Esc, ..
                 } => {
                     self.command = String::from("");
-                    self.refresh_screen()?;
+                    // self.refresh_screen()?;
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
+                    self.mode = "Normal".to_string();
+                    self.refresh_screen()?;
                 }
                 _ => self.mode_changed = false,
             },
@@ -201,6 +209,8 @@ impl Kass {
                 } => {
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
+                    self.mode = "Normal".to_string();
+                    self.refresh_screen()?;
                 }
                 _ => self.mode_changed = false,
             },
@@ -237,19 +247,26 @@ impl Kass {
     //cursor handler
 
     fn move_cursor(&mut self, key: MovementKey) {
-        let row_idx = if self.cursor.y as usize >= self.rows.len() {
-            None
-        } else {
-            Some(self.cursor.y)
-        };
-
         match key {
-            MovementKey::Left => self.cursor.x = self.cursor.x.saturating_sub(1),
+            MovementKey::Left => {
+                if self.cursor.x != 0 {
+                    self.cursor.x -= 1;
+                } else if self.cursor.y > 0 {
+                    self.cursor.y -= 1;
+                    self.cursor.x = self.rows[self.cursor.y as usize].len() as u16;
+                }
+            }
 
             MovementKey::Right => {
-                if let Some(idx) = row_idx {
-                    if self.rows[idx as usize].len() > self.cursor.x as usize {
+                if self.cursor.y < self.rows.len() as u16 {
+                    let idx = self.cursor.y;
+
+                    // checks whether cursor exceeds rows length or not
+                    if self.cursor.x < self.rows[idx as usize].len() as u16 {
                         self.cursor.x += 1;
+                    } else if self.cursor.y < self.rows.len() as u16 {
+                        self.cursor.y += 1;
+                        self.cursor.x = 0;
                     }
                 }
             }
@@ -275,21 +292,19 @@ impl Kass {
 
     fn scroll(&mut self) -> Result<()> {
         let bounds = self.screen.boundary();
-        // to display position of the cursor
-        // stdout()
-        //     .queue(cursor::MoveTo(0, 0))?
-        //     .queue(Print(format!("{} {}", self.cursor.x, self.cursor.y)))?;
 
+        // for vertical scrolling
         if self.cursor.y < self.rowoff {
             self.rowoff = self.cursor.y;
         }
         if self.cursor.y >= self.rowoff + bounds.y {
             self.rowoff = self.cursor.y - bounds.y + 1;
         }
+
+        // for horizontal scrolling
         if self.cursor.x < self.coloff {
             self.coloff = self.cursor.x;
         }
-
         if self.cursor.x >= self.coloff + bounds.x {
             self.coloff = self.cursor.x - bounds.x + 1;
         }
@@ -318,10 +333,6 @@ impl Kass {
                 ..
             } => {
                 // self.text.push('\n');
-
-                // if self.cursor.x > 3 {
-                //     self.cursor.x -= 1;
-                // }
 
                 self.cursor.y += 1;
 
@@ -417,7 +428,7 @@ impl Kass {
             terminal::Clear(terminal::ClearType::All),
         )?;
 
-        // self.statusbar.paint(self.mode.clone())?;
+        self.statusbar.paint(self.mode.clone())?;
         self.screen
             .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
 
