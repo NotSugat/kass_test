@@ -20,25 +20,31 @@ const LNO_SHIFT: u16 = 7;
 impl Screen {
     pub fn new() -> Result<Self> {
         let ln_display = true;
-        let (terminal_height, terminal_width) = crossterm::terminal::size()?;
+        let (terminal_width, terminal_height) = crossterm::terminal::size()?;
         Ok(Screen {
-            width: terminal_width as usize,
+            width: (terminal_width) as usize,
             height: (terminal_height) as usize,
             ln_display: true,
             ln_shift: if ln_display { LNO_SHIFT } else { 0 },
         })
     }
 
-    pub fn draw_screen(&mut self, rows: &[String]) -> Result<()> {
-        for i in 0..self.height {
-            if i >= rows.len() {
+    pub fn draw_screen(&mut self, rows: &[String], rowoff: usize) -> Result<()> {
+        for i in 0..(self.height - 2) {
+            let row = i + rowoff;
+            if row >= rows.len() {
             } else {
-                let len = rows[i].len().min(self.width);
+                let len = rows[row].len().min(self.width);
                 stdout()
                     .queue(cursor::MoveTo(0, i as u16))?
-                    .queue(Print(rows[i][0..len].to_string()))?;
+                    .queue(Print(rows[row][0..len].to_string()))?;
             }
         }
+        Ok(())
+    }
+
+    pub fn move_to(&mut self, pos: &Position, rowoff: u16) -> Result<()> {
+        stdout().queue(cursor::MoveTo(pos.x, pos.y - rowoff))?;
         Ok(())
     }
     // terminal boundary
@@ -46,7 +52,7 @@ impl Screen {
     pub fn boundary(&self) -> Position {
         // minus 2 because of the scroll bar at the right side
         Position {
-            x: self.width as u16 - 2,
+            x: self.width as u16,
             y: self.height as u16 - 2,
         }
     }

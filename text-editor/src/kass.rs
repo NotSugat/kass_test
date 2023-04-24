@@ -107,7 +107,7 @@ impl Kass {
                     KeyCode::Char(c) => self.character = c,
                     _ => {}
                 }
-
+                self.screen.move_to(&self.cursor, self.rowoff)?;
                 self.handle_modes()?;
 
                 if !self.mode_changed {
@@ -238,9 +238,10 @@ impl Kass {
 
     fn scroll(&mut self) -> Result<()> {
         let bounds = self.screen.boundary();
-        stdout()
-            .queue(cursor::MoveTo(0, 0))?
-            .queue(Print(format!("{} {}", self.cursor.x, self.cursor.y)))?;
+        // to display position of the cursor
+        // stdout()
+        //     .queue(cursor::MoveTo(0, 0))?
+        //     .queue(Print(format!("{} {}", self.cursor.x, self.cursor.y)))?;
 
         if self.cursor.y < self.rowoff {
             self.rowoff = self.cursor.y;
@@ -249,14 +250,6 @@ impl Kass {
             self.rowoff = self.cursor.y - bounds.y + 1;
         }
         Ok(())
-
-        // if self.render_x < self.coloff {
-        //     self.coloff = self.render_x;
-        // }
-
-        // if self.render_x >= self.coloff + bounds.x {
-        //     self.coloff = self.render_x - bounds.x + 1;
-        // }
     }
 
     // handle insert mode
@@ -379,8 +372,8 @@ impl Kass {
             terminal::Clear(terminal::ClearType::All),
         )?;
 
+        self.screen.draw_screen(&self.rows, self.rowoff as usize)?;
         self.scroll()?;
-        self.screen.draw_screen(&self.rows)?;
 
         // for ch in self.text.as_bytes().iter() {
         //     let character = *ch as char;
@@ -393,7 +386,7 @@ impl Kass {
         //     }
         // }
 
-        execute!(stdout(), cursor::MoveTo(self.cursor.x, self.cursor.y))?;
+        self.screen.move_to(&self.cursor, self.rowoff)?;
         stdout().flush()?;
 
         Ok(())
