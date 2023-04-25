@@ -38,7 +38,7 @@ pub struct Kass {
     screen: Screen,
     mode: String,
 
-    rows: Vec<String>,
+    rows: Vec<Row>,
     rowoff: u16,
     coloff: u16,
 
@@ -86,7 +86,15 @@ impl Kass {
             rows: if data.is_empty() {
                 Vec::new()
             } else {
-                Vec::from(data)
+                let v = Vec::from(data);
+                let mut rows = Vec::new();
+                for row in v {
+                    rows.push(Row::new(row))
+                }
+                if rows.last().unwrap().len() == 0 {
+                    rows.pop();
+                }
+                rows
             },
             rowoff: 0,
             coloff: 0,
@@ -99,7 +107,7 @@ impl Kass {
     }
 
     pub fn run(&mut self) -> Result<()> {
-        self.statusbar.paint(self.mode.clone())?;
+        // self.statusbar.paint(self.mode.clone())?;
         self.refresh_screen()?;
 
         loop {
@@ -338,17 +346,19 @@ impl Kass {
 
                 self.refresh_screen()?;
             }
+
             _ => {
-                // print
+                // // print
                 if !self.character.is_control() {
                     // self.text.push(self.character);
+                    self.insert_char(self.character);
+                    self.refresh_screen()?;
+                    // let output = write!(stdout(), "{}", self.character);
 
-                    let output = write!(stdout(), "{}", self.character);
+                    // self.cursor.x += 1;
 
-                    self.cursor.x += 1;
-
-                    stdout().flush()?;
-                    drop(output);
+                    // stdout().flush()?;
+                    // drop(output);
                 }
             }
         }
@@ -428,7 +438,7 @@ impl Kass {
             terminal::Clear(terminal::ClearType::All),
         )?;
 
-        self.statusbar.paint(self.mode.clone())?;
+        // self.statusbar.paint(self.mode.clone(), self.filepath)?;
         self.screen
             .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
 
@@ -460,5 +470,22 @@ impl Kass {
         // file.write_all(self.text.as_bytes())?;
 
         Ok(())
+    }
+
+    // handling insertion
+    fn insert_char(&mut self, c: char) {
+        if self.cursor.y < self.rows.len() as u16 {
+            self.insert_row(self.rows.len(), String::new());
+        }
+        self.rows[self.cursor.y as usize].insert_char(self.cursor.x as usize, c);
+        self.cursor.x += 1;
+    }
+    fn insert_row(&mut self, at: usize, s: String) {
+        if at > self.rows.len() {
+            return;
+        }
+
+        self.rows.insert(at, Row::new(s));
+        // self.dirty += 1;
     }
 }

@@ -1,3 +1,4 @@
+use super::row::*;
 use crossterm::{
     self, cursor, execute,
     style::{Attribute, Print, SetAttribute},
@@ -29,7 +30,7 @@ impl Screen {
         })
     }
 
-    pub fn draw_screen(&mut self, rows: &[String], rowoff: usize, coloff: usize) -> Result<()> {
+    pub fn draw_screen(&mut self, rows: &[Row], rowoff: usize, coloff: usize) -> Result<()> {
         for i in 0..(self.height - 2) {
             let row = i + rowoff;
             if row >= rows.len() {
@@ -45,7 +46,7 @@ impl Screen {
 
                 stdout()
                     .queue(cursor::MoveTo(0, i as u16))?
-                    .queue(Print(rows[row][start..end].to_string()))?;
+                    .queue(Print(rows[row].chars[start..end].to_string()))?;
             }
         }
         Ok(())

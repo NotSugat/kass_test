@@ -1,6 +1,6 @@
 use crossterm::style::Color;
 
-const TAB_SIZE: usize = 8;
+const TAB_SIZE: usize = 2;
 
 #[derive(Debug, Clone)]
 pub struct Row {
@@ -19,10 +19,6 @@ impl Row {
         result
     }
 
-    pub fn render_len(&self) -> usize {
-        self.render.len()
-    }
-
     pub fn len(&self) -> usize {
         self.chars.len()
     }
@@ -36,9 +32,17 @@ impl Row {
         self.render_row();
     }
 
+    fn render_row(&mut self) {
+        let mut render = String::new();
+        for c in self.chars.chars() {
+            render.push(c);
+        }
+
+        self.render = render;
+    }
+
     /* returns true if row was modified, false otherwise */
     pub fn del_char(&mut self, at: usize, to_previous_tabstop: bool) -> bool {
-        // 123456
         if at >= self.chars.len() {
             false
         } else {
@@ -51,14 +55,12 @@ impl Row {
                 }
             }
 
-            self.render_row();
             true
         }
     }
 
     pub fn split(&mut self, at: usize) -> String {
         let result = self.chars.split_off(at);
-        self.render_row();
 
         result
     }
@@ -69,29 +71,5 @@ impl Row {
 
     pub fn append_string(&mut self, s: &str) {
         self.chars.push_str(s);
-        self.render_row();
-    }
-
-    fn render_row(&mut self) {
-        let mut render = String::new();
-        let mut idx = 0;
-        for c in self.chars.chars() {
-            match c {
-                '\t' => {
-                    render.push(' ');
-                    idx += 1;
-                    while idx % TAB_SIZE != 0 {
-                        render.push(' ');
-                        idx += 1;
-                    }
-                }
-                _ => {
-                    render.push(c);
-                    idx += 1;
-                }
-            }
-        }
-
-        self.render = render;
     }
 }
