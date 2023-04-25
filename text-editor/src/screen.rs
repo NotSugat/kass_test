@@ -1,6 +1,6 @@
 use super::row::*;
 use crossterm::{
-    self, cursor, execute,
+    self, cursor,
     style::{Attribute, Print, SetAttribute},
     terminal, QueueableCommand,
 };

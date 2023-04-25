@@ -2,7 +2,7 @@ use std::io::{stdout, Result};
 
 use crossterm::{
     cursor, queue,
-    style::{self, Color, Print, SetBackgroundColor, SetForegroundColor, Stylize},
+    style::{Color, Print, SetForegroundColor, Stylize},
 };
 
 #[derive(Debug, Clone)]

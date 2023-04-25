@@ -1,7 +1,3 @@
-use crossterm::style::Color;
-
-const TAB_SIZE: usize = 2;
-
 #[derive(Debug, Clone)]
 pub struct Row {
     pub chars: String,
@@ -49,7 +45,7 @@ impl Row {
             self.chars.remove(at);
 
             if to_previous_tabstop && at == self.chars.len() {
-                let prev_stop = self.chars.len() - (self.chars.len() % TAB_SIZE);
+                let prev_stop = self.chars.len() - (self.chars.len() % 2);
                 while self.chars.ends_with(' ') && self.chars.len() > prev_stop {
                     self.chars.pop();
                 }

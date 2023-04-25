@@ -1,5 +1,3 @@
-use crate::screen;
-
 use super::mode::*;
 use super::row::*;
 use super::screen::*;
@@ -8,15 +6,12 @@ use super::statusbar::*;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers},
-    execute,
-    style::{Attribute, Print, SetAttribute},
-    terminal, QueueableCommand,
+    execute, terminal,
 };
 use std::{
     env,
-    fs::{read_to_string, OpenOptions},
+    fs::OpenOptions,
     io::{stdout, Result, Write},
-    path::Path,
 };
 use text_editor::*;
 

@@ -1,5 +1,4 @@
 use crossterm::{cursor, execute, terminal};
-use kass::Kass;
 use std::{
     env::args,
     io::{stdout, Result},
