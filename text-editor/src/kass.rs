@@ -13,6 +13,7 @@ use crossterm::{
     terminal, QueueableCommand,
 };
 use std::{
+    env,
     fs::{read_to_string, OpenOptions},
     io::{stdout, Result, Write},
     path::Path,
@@ -41,6 +42,7 @@ pub struct Kass {
     rows: Vec<Row>,
     rowoff: u16,
     coloff: u16,
+    absolute_path: String,
 
     // cursor position
     cursor: Position,
@@ -80,7 +82,7 @@ impl Kass {
             command: String::from(""),
             quit_kass: false,
             filepath: String::from(filepath),
-
+            absolute_path: String::new(),
             mode: String::from("Normal"),
 
             rows: if data.is_empty() {
@@ -105,9 +107,18 @@ impl Kass {
             terminal_width: width,
         })
     }
-
+    // get curren directory path
+    fn get_current_working_dir(&mut self) -> String {
+        let res = env::current_dir();
+        match res {
+            Ok(path) => path.into_os_string().into_string().unwrap(),
+            Err(_) => "FAILED".to_string(),
+        }
+    }
     pub fn run(&mut self) -> Result<()> {
-        // self.statusbar.paint(self.mode.clone())?;
+        self.absolute_path = self.get_current_working_dir() + "/" + &self.filepath;
+        self.statusbar
+            .paint(self.mode.clone(), self.absolute_path.clone())?;
         self.refresh_screen()?;
 
         loop {
@@ -161,7 +172,7 @@ impl Kass {
                     self.current_mode = Mode::Insert;
                     self.mode_changed = true;
                     self.mode = "Insert".to_string();
-                    // self.refresh_screen()?;
+                    self.refresh_screen()?;
                 }
                 KeyEvent {
                     code: KeyCode::Char('a'),
@@ -179,7 +190,7 @@ impl Kass {
                 } => {
                     self.current_mode = Mode::Visual;
                     self.mode = "Visual".to_string();
-                    // self.refresh_screen()?;
+                    self.refresh_screen()?;
                 }
 
                 // command mode
@@ -190,7 +201,7 @@ impl Kass {
                 } => {
                     self.current_mode = Mode::Command;
                     self.mode = "Command".to_string();
-                    // self.refresh_screen()?;
+                    self.refresh_screen()?;
                 }
                 _ => {
                     self.mode_changed = false;
@@ -206,7 +217,8 @@ impl Kass {
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
                     self.mode = "Normal".to_string();
-                    // self.refresh_screen()?;
+                    execute!(stdout(), terminal::Clear(terminal::ClearType::All),)?;
+                    self.refresh_screen()?;
                 }
                 _ => self.mode_changed = false,
             },
@@ -218,7 +230,7 @@ impl Kass {
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
                     self.mode = "Normal".to_string();
-                    // self.refresh_screen()?;
+                    self.refresh_screen()?;
                 }
                 _ => self.mode_changed = false,
             },
@@ -317,6 +329,7 @@ impl Kass {
             self.coloff = self.cursor.x - bounds.x + 1;
         }
 
+        self.screen.clear()?;
         Ok(())
     }
 
@@ -340,10 +353,7 @@ impl Kass {
                 code: KeyCode::Enter,
                 ..
             } => {
-                // self.text.push('\n');
-
-                self.cursor.y += 1;
-
+                self.goto_newline()?;
                 self.refresh_screen()?;
             }
 
@@ -435,13 +445,12 @@ impl Kass {
 
         // flickering issur due to this
 
-        // execute!(
-        //     stdout(),
-        //     cursor::MoveTo(0, 0),
-        //     terminal::Clear(terminal::ClearType::All),
-        // )?;
+        // stdout()
+        //     .queue(terminal::Clear(terminal::ClearType::All))?
+        //     .queue(cursor::MoveTo(0, 0))?;
 
-        // self.statusbar.paint(self.mode.clone(), self.filepath)?;
+        self.statusbar
+            .paint(self.mode.clone(), self.absolute_path.clone())?;
         self.screen
             .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
 
@@ -478,7 +487,7 @@ impl Kass {
 
     // handling insertion
     fn insert_char(&mut self, c: char) {
-        if self.cursor.y < self.rows.len() as u16 {
+        if !self.cursor.above(self.rows.len()) {
             self.insert_row(self.rows.len(), String::new());
         }
         self.rows[self.cursor.y as usize].insert_char(self.cursor.x as usize, c);
@@ -491,5 +500,12 @@ impl Kass {
 
         self.rows.insert(at, Row::new(s));
         // self.dirty += 1;
+    }
+    fn goto_newline(&mut self) -> Result<()> {
+        let content = self.rows[self.cursor.y as usize].split(self.cursor.x as usize);
+        self.insert_row((self.cursor.y + 1) as usize, content);
+        self.cursor.x = 0;
+        self.cursor.y += 1;
+        Ok(())
     }
 }

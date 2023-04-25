@@ -2,7 +2,7 @@ use super::row::*;
 use crossterm::{
     self, cursor, execute,
     style::{Attribute, Print, SetAttribute},
-    QueueableCommand,
+    terminal, QueueableCommand,
 };
 use std::io::{stdout, Result, Write};
 use text_editor::Position;
@@ -49,8 +49,12 @@ impl Screen {
                     .queue(Print(rows[row].chars[start..end].to_string()))?;
             }
         }
-        stdout().flush()?;
 
+        Ok(())
+    }
+
+    pub fn clear(&self) -> Result<()> {
+        stdout().queue(terminal::Clear(terminal::ClearType::All))?;
         Ok(())
     }
 
