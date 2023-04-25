@@ -49,6 +49,8 @@ impl Screen {
                     .queue(Print(rows[row].chars[start..end].to_string()))?;
             }
         }
+        stdout().flush()?;
+
         Ok(())
     }
 

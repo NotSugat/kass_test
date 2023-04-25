@@ -161,7 +161,7 @@ impl Kass {
                     self.current_mode = Mode::Insert;
                     self.mode_changed = true;
                     self.mode = "Insert".to_string();
-                    self.refresh_screen()?;
+                    // self.refresh_screen()?;
                 }
                 KeyEvent {
                     code: KeyCode::Char('a'),
@@ -179,7 +179,7 @@ impl Kass {
                 } => {
                     self.current_mode = Mode::Visual;
                     self.mode = "Visual".to_string();
-                    self.refresh_screen()?;
+                    // self.refresh_screen()?;
                 }
 
                 // command mode
@@ -190,7 +190,7 @@ impl Kass {
                 } => {
                     self.current_mode = Mode::Command;
                     self.mode = "Command".to_string();
-                    self.refresh_screen()?;
+                    // self.refresh_screen()?;
                 }
                 _ => {
                     self.mode_changed = false;
@@ -206,7 +206,7 @@ impl Kass {
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
                     self.mode = "Normal".to_string();
-                    self.refresh_screen()?;
+                    // self.refresh_screen()?;
                 }
                 _ => self.mode_changed = false,
             },
@@ -218,7 +218,7 @@ impl Kass {
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
                     self.mode = "Normal".to_string();
-                    self.refresh_screen()?;
+                    // self.refresh_screen()?;
                 }
                 _ => self.mode_changed = false,
             },
@@ -432,11 +432,14 @@ impl Kass {
 
     fn refresh_screen(&mut self) -> Result<()> {
         self.scroll()?;
-        execute!(
-            stdout(),
-            cursor::MoveTo(0, 0),
-            terminal::Clear(terminal::ClearType::All),
-        )?;
+
+        // flickering issur due to this
+
+        // execute!(
+        //     stdout(),
+        //     cursor::MoveTo(0, 0),
+        //     terminal::Clear(terminal::ClearType::All),
+        // )?;
 
         // self.statusbar.paint(self.mode.clone(), self.filepath)?;
         self.screen
@@ -455,6 +458,7 @@ impl Kass {
 
         self.screen
             .move_to(&self.cursor, self.rowoff, self.coloff)?;
+
         stdout().flush()?;
 
         Ok(())
