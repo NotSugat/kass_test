@@ -337,11 +337,7 @@ impl Kass {
                 ..
             } => {
                 // self.text.pop();
-                if self.cursor.x != 0 {
-                    self.cursor.x = self.cursor.x.saturating_sub(1);
-                } else {
-                    self.cursor.y = self.cursor.y.saturating_sub(1);
-                }
+                self.del_char();
                 self.refresh_screen()?;
             }
             KeyEvent {
@@ -488,19 +484,49 @@ impl Kass {
         self.rows[self.cursor.y as usize].insert_char(self.cursor.x as usize, c);
         self.cursor.x += 1;
     }
+
     fn insert_row(&mut self, at: usize, s: String) {
         if at > self.rows.len() {
             return;
         }
-
         self.rows.insert(at, Row::new(s));
-        // self.dirty += 1;
     }
+
     fn goto_newline(&mut self) -> Result<()> {
         let content = self.rows[self.cursor.y as usize].split(self.cursor.x as usize);
         self.insert_row((self.cursor.y + 1) as usize, content);
         self.cursor.x = 0;
         self.cursor.y += 1;
         Ok(())
+    }
+
+    // handling deletion of character
+
+    fn del_char(&mut self) {
+        if !self.cursor.above(self.rows.len()) {
+            return;
+        }
+        if self.cursor.x == 0 && self.cursor.y == 0 {
+            return;
+        }
+
+        let curr_row = self.cursor.y as usize;
+
+        if self.cursor.x > 0 {
+            self.rows[curr_row].del_char(self.cursor.x as usize - 1);
+            self.cursor.x -= 1;
+        } else {
+            self.del_row(curr_row);
+            self.cursor.x = self.rows[curr_row - 1].len() as u16;
+            self.cursor.y -= 1;
+        }
+    }
+
+    fn del_row(&mut self, row_idx: usize) {
+        if row_idx >= self.rows.len() {
+            return;
+        } else {
+            self.rows.remove(row_idx);
+        }
     }
 }

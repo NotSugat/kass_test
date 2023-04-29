@@ -38,19 +38,11 @@ impl Row {
     }
 
     /* returns true if row was modified, false otherwise */
-    pub fn del_char(&mut self, at: usize, to_previous_tabstop: bool) -> bool {
-        if at >= self.chars.len() {
+    pub fn del_char(&mut self, idx: usize) -> bool {
+        if idx >= self.chars.len() {
             false
         } else {
-            self.chars.remove(at);
-
-            if to_previous_tabstop && at == self.chars.len() {
-                let prev_stop = self.chars.len() - (self.chars.len() % 2);
-                while self.chars.ends_with(' ') && self.chars.len() > prev_stop {
-                    self.chars.pop();
-                }
-            }
-
+            self.chars.remove(idx);
             true
         }
     }
