@@ -330,6 +330,7 @@ impl Kass {
 
     // handle insert mode
     fn handle_insert_mode(&mut self) -> Result<()> {
+       
         match self.key_event {
             KeyEvent {
                 code: KeyCode::Backspace,
@@ -348,7 +349,33 @@ impl Kass {
                 self.refresh_screen()?;
             }
 
+            KeyEvent {
+                code: KeyCode::Left,
+                 .. 
+            } => {
+                self.move_cursor(MovementKey::Left);
+            },
+            KeyEvent {
+                code: KeyCode::Right,
+                ..
+            }=> {
+                self.move_cursor(MovementKey::Right);
+            }
+            KeyEvent {
+                code: KeyCode::Up,
+                ..
+            }=> {
+                self.move_cursor(MovementKey::Up);
+            }
+            KeyEvent {
+                code: KeyCode::Down,
+                ..
+            }=>{
+                self.move_cursor(MovementKey::Down);
+            }
             _ => {
+
+
                 // // print
                 if !self.character.is_control() {
                     // self.text.push(self.character);
