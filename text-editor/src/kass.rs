@@ -3,6 +3,7 @@ use super::row::*;
 use super::screen::*;
 use super::statusbar::*;
 
+use crossterm::QueueableCommand;
 use crossterm::{
     cursor,
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers},
@@ -279,7 +280,7 @@ impl Kass {
                     // checks whether cursor exceeds rows length or not
                     if self.cursor.x < self.rows[idx as usize].len() as u16 {
                         self.cursor.x += 1;
-                    } else if self.cursor.y < self.rows.len() as u16 {
+                    } else if self.cursor.y < self.rows.len() as u16 - 1 {
                         self.cursor.y += 1;
                         self.cursor.x = 0;
                     }
@@ -287,7 +288,7 @@ impl Kass {
             }
 
             MovementKey::Up => self.cursor.y = self.cursor.y.saturating_sub(1),
-            MovementKey::Down if self.cursor.y < self.rows.len() as u16 => self.cursor.y += 1,
+            MovementKey::Down if self.cursor.y < self.rows.len() as u16 - 1 => self.cursor.y += 1,
             _ => {}
         }
 
@@ -330,7 +331,6 @@ impl Kass {
 
     // handle insert mode
     fn handle_insert_mode(&mut self) -> Result<()> {
-       
         match self.key_event {
             KeyEvent {
                 code: KeyCode::Backspace,
@@ -351,42 +351,32 @@ impl Kass {
 
             KeyEvent {
                 code: KeyCode::Left,
-                 .. 
+                ..
             } => {
                 self.move_cursor(MovementKey::Left);
-            },
+            }
             KeyEvent {
                 code: KeyCode::Right,
                 ..
-            }=> {
+            } => {
                 self.move_cursor(MovementKey::Right);
             }
             KeyEvent {
-                code: KeyCode::Up,
-                ..
-            }=> {
+                code: KeyCode::Up, ..
+            } => {
                 self.move_cursor(MovementKey::Up);
             }
             KeyEvent {
                 code: KeyCode::Down,
                 ..
-            }=>{
+            } => {
                 self.move_cursor(MovementKey::Down);
             }
             _ => {
-
-
                 // // print
                 if !self.character.is_control() {
-                    // self.text.push(self.character);
                     self.insert_char(self.character);
                     self.refresh_screen()?;
-                    // let output = write!(stdout(), "{}", self.character);
-
-                    // self.cursor.x += 1;
-
-                    // stdout().flush()?;
-                    // drop(output);
                 }
             }
         }
@@ -461,7 +451,11 @@ impl Kass {
     fn refresh_screen(&mut self) -> Result<()> {
         self.scroll()?;
 
-        // flickering issur due to this
+        // for displaying position of cursor if needed
+        // print!("{} {}", self.cursor.x, self.cursor.y);
+        // stdout().flush()?;
+
+        // flickering issue due to this
 
         // stdout()
         //     .queue(terminal::Clear(terminal::ClearType::All))?
@@ -471,17 +465,6 @@ impl Kass {
             .paint(self.mode.clone(), self.absolute_path.clone())?;
         self.screen
             .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
-
-        // for ch in self.text.as_bytes().iter() {
-        //     let character = *ch as char;
-
-        //     if character == '\n' {
-        //         write!(stdout(), "{}", "\r\n")?;
-        //         stdout().flush()?;
-        //     } else {
-        //         write!(stdout(), "{}", character)?
-        //     }
-        // }
 
         self.screen
             .move_to(&self.cursor, self.rowoff, self.coloff)?;
@@ -512,17 +495,24 @@ impl Kass {
         self.cursor.x += 1;
     }
 
-    fn insert_row(&mut self, at: usize, s: String) {
-        if at > self.rows.len() {
+    fn insert_row(&mut self, idx: usize, row_content: String) {
+        if idx > self.rows.len() {
             return;
         }
-        self.rows.insert(at, Row::new(s));
+        self.rows.insert(idx, Row::new(row_content));
     }
 
     fn goto_newline(&mut self) -> Result<()> {
-        let content = self.rows[self.cursor.y as usize].split(self.cursor.x as usize);
-        self.insert_row((self.cursor.y + 1) as usize, content);
+        let row_idx = self.cursor.y as usize;
+        if self.cursor.x == 0 {
+            self.insert_row(row_idx, String::from(""));
+        } else {
+            let content = self.rows[self.cursor.y as usize].split(self.cursor.x as usize);
+            self.insert_row(row_idx + 1, content);
+        };
+
         self.cursor.x = 0;
+
         self.cursor.y += 1;
         Ok(())
     }
@@ -540,20 +530,21 @@ impl Kass {
         let curr_row = self.cursor.y as usize;
 
         if self.cursor.x > 0 {
-            self.rows[curr_row].del_char(self.cursor.x as usize - 1);
-            self.cursor.x -= 1;
+            if self.rows[curr_row].del_char(self.cursor.x as usize - 1) {
+                if self.cursor.x >= self.rows[curr_row].len() as u16 {
+                    self.cursor.x = self.rows[curr_row].len() as u16;
+                } else {
+                    self.cursor.x -= 1;
+                }
+            }
         } else {
-            self.del_row(curr_row);
-            self.cursor.x = self.rows[curr_row - 1].len() as u16;
-            self.cursor.y -= 1;
-        }
-    }
+            let row_content = self.rows[curr_row].chars.clone();
 
-    fn del_row(&mut self, row_idx: usize) {
-        if row_idx >= self.rows.len() {
-            return;
-        } else {
-            self.rows.remove(row_idx);
+            self.cursor.x = self.rows[curr_row - 1].len() as u16;
+            self.rows[curr_row - 1].append_string(row_content);
+            self.rows.remove(curr_row);
+
+            self.cursor.y -= 1;
         }
     }
 }

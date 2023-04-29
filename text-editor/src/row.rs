@@ -57,7 +57,8 @@ impl Row {
         self.chars.len() - self.chars.trim_start_matches(' ').len()
     }
 
-    pub fn append_string(&mut self, s: &str) {
-        self.chars.push_str(s);
+    pub fn append_string(&mut self, s: String) {
+        let strContent = s.as_str();
+        self.chars.push_str(strContent);
     }
 }
