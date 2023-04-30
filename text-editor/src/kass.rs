@@ -3,6 +3,7 @@ use super::row::*;
 use super::screen::*;
 use super::statusbar::*;
 
+use crossterm::style::Print;
 use crossterm::QueueableCommand;
 use crossterm::{
     cursor,
@@ -474,15 +475,42 @@ impl Kass {
         Ok(())
     }
 
-    // write to file
-    fn write_to_file(&self) -> Result<()> {
+    // save file
+    fn rows_to_string(&self) -> String {
+        let mut content = String::new();
+
+        for row in &self.rows {
+            content.push_str(row.chars.as_str());
+            content.push('\n');
+        }
+        content
+    }
+
+    fn write_to_file(&mut self) -> Result<()> {
         let mut file = OpenOptions::new()
             .write(true)
             .create(true)
             .open(&self.filepath)?;
 
-        // file.write_all(self.text.as_bytes())?;
+        let text = self.rows_to_string();
+        let len = text.as_bytes().len();
 
+        file.write_all(text.as_bytes())?;
+
+        println!("hwllo rodsljflkdshfjkshdfdshg fhsdg fhdsasdgh f jghsahg sadjf");
+
+        self.draw_statusbar(len)?;
+        self.refresh_screen()?;
+
+        Ok(())
+    }
+    pub fn draw_statusbar(&mut self, len: usize) -> Result<()> {
+        println!("hello world");
+        stdout()
+            .queue(cursor::MoveTo(0, self.terminal_height as u16 - 1))?
+            .queue(Print(format!("{len} bytes written to the disk")))?;
+
+        self.refresh_screen()?;
         Ok(())
     }
 
@@ -543,8 +571,15 @@ impl Kass {
             self.cursor.x = self.rows[curr_row - 1].len() as u16;
             self.rows[curr_row - 1].append_string(row_content);
             self.rows.remove(curr_row);
-
             self.cursor.y -= 1;
         }
     }
+
+    // fn del_row(&mut self, row_idx: usize) -> Option<String> {
+    //     if row >= self.rows.len() {
+    //         None
+    //     } else {
+    //         Some(self.rows.remove(row_idx).chars)
+    //     }
+    // }
 }

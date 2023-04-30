@@ -52,6 +52,14 @@ impl Screen {
 
         Ok(())
     }
+    // draw status bar
+    pub fn draw_statusbar(&self, len: usize) -> Result<()> {
+        println!("hello world");
+        stdout()
+            .queue(cursor::MoveTo(0, self.height as u16 - 1))?
+            .queue(Print(format!("{len} bytes written to the disk")))?;
+        Ok(())
+    }
 
     pub fn clear(&self) -> Result<()> {
         stdout().queue(terminal::Clear(terminal::ClearType::All))?;
