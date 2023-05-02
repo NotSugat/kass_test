@@ -10,6 +10,8 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers},
     execute, terminal,
 };
+// use std::intrinsics::mir::Move;
+// use std::time::Instant;
 use std::{
     env,
     fs::OpenOptions,
@@ -24,6 +26,9 @@ pub struct Kass {
 
     key_event: KeyEvent,
     character: char,
+
+    // status_message: String,
+    // status_time: Instant,
 
     quit_kass: bool,
 
@@ -76,6 +81,8 @@ impl Kass {
             character: 'f',
             statusbar,
             screen: Screen::new()?,
+            // status_message: String::new(),
+            // status_time: Instant::now(),
             command: String::from(""),
             quit_kass: false,
             filepath: String::from(filepath),
@@ -209,7 +216,7 @@ impl Kass {
                 KeyEvent {
                     code: KeyCode::Esc, ..
                 } => {
-                    self.command = String::from("");
+                    self.command = String::from(":");
                     // self.refresh_screen()?;
                     self.current_mode = Mode::Normal;
                     self.mode_changed = true;
@@ -303,8 +310,7 @@ impl Kass {
         // compare length of the row and cursor x position and gives min value between them
         self.cursor.x = self.cursor.x.min(rowlen);
 
-        self.refresh_screen()
-            .expect("not working refresh screen in move cursor function");
+        self.refresh_screen().expect("not working refresh screen in move cursor function");
     }
 
     fn scroll(&mut self) -> Result<()> {
@@ -373,6 +379,18 @@ impl Kass {
             } => {
                 self.move_cursor(MovementKey::Down);
             }
+            KeyEvent{
+                code: KeyCode::Tab,
+                modifiers: KeyModifiers::NONE,
+                ..
+            }=>
+            {
+                self.insert_char('\t');
+                self.refresh_screen()?;
+                
+                // cursor::MoveTo(self.cursor.x + 4, self.cursor.y);
+                // cursor::MoveToColumn(self.cursor.x);
+            }
             _ => {
                 // // print
                 if !self.character.is_control() {
@@ -399,13 +417,16 @@ impl Kass {
         match self.key_event {
             KeyEvent {
                 code: KeyCode::Backspace,
-                modifiers: KeyModifiers::NONE,
+                // modifiers: KeyModifiers::NONE,
                 ..
             } => {
-                self.command.pop();
-                self.refresh_screen()?;
+               
+                    self.move_cursor(MovementKey::Left);
+
+                self.del_char();
             }
 
+            
             KeyEvent {
                 code: KeyCode::Enter,
                 ..
@@ -469,7 +490,8 @@ impl Kass {
 
         self.screen
             .move_to(&self.cursor, self.rowoff, self.coloff)?;
-
+        
+        
         stdout().flush()?;
 
         Ok(())
@@ -582,4 +604,13 @@ impl Kass {
     //         Some(self.rows.remove(row_idx).chars)
     //     }
     // }
+    
+    // prints messages on saving; 
+
+//     fn set_message<T: Into<String>>(&mut self, T)
+//     {
+//         self.status_time = Instant::now();
+//         self.status_message = message.into();
+//     }
 }
+

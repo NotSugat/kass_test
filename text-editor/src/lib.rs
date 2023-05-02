@@ -31,4 +31,5 @@ pub enum MovementKey {
     Right,
     Up,
     Down,
+    // Tab,
 }

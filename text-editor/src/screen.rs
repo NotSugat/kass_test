@@ -4,7 +4,7 @@ use crossterm::{
     style::{Attribute, Print, SetAttribute},
     terminal, QueueableCommand,
 };
-use std::io::{stdout, Result, Write};
+use std::{io::{stdout, Result, Write}, env::current_exe};
 use text_editor::Position;
 
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub struct Screen {
     ln_display: bool,
 }
 
-const LNO_SHIFT: u16 = 7;
+const LNO_SHIFT: u16 = 6;
 
 impl Screen {
     pub fn new() -> Result<Self> {
@@ -42,10 +42,13 @@ impl Screen {
                 }
                 len -= coloff;
                 let start = coloff;
-                let end = start + if len >= self.width { self.width } else { len };
+                let end = start + if len >= (self.width - (LNO_SHIFT as usize) ){ self.width - (LNO_SHIFT) as usize} else { len };
 
                 stdout()
-                    .queue(cursor::MoveTo(0, i as u16))?
+                    // .queue(SetAttribute(Attribute::Reset))?
+                    .queue(cursor::MoveTo(0, i as u16 ))?
+                    .queue(Print(format!("{:3}", row + 1)))?
+                    .queue(cursor::MoveTo(LNO_SHIFT, i as u16))?
                     .queue(Print(rows[row].chars[start..end].to_string()))?;
             }
         }
@@ -56,7 +59,7 @@ impl Screen {
     pub fn draw_statusbar(&self, len: usize) -> Result<()> {
         println!("hello world");
         stdout()
-            .queue(cursor::MoveTo(0, self.height as u16 - 1))?
+            .queue(cursor::MoveTo(LNO_SHIFT, self.height as u16 - 1))?
             .queue(Print(format!("{len} bytes written to the disk")))?;
         Ok(())
     }
@@ -67,7 +70,7 @@ impl Screen {
     }
 
     pub fn move_to(&mut self, pos: &Position, rowoff: u16, coloff: u16) -> Result<()> {
-        stdout().queue(cursor::MoveTo(pos.x - coloff, pos.y - rowoff))?;
+        stdout().queue(cursor::MoveTo(pos.x - coloff + LNO_SHIFT, pos.y - rowoff))?;
         Ok(())
     }
     // terminal boundary
@@ -75,7 +78,7 @@ impl Screen {
     pub fn boundary(&self) -> Position {
         // minus 2 because of the scroll bar at the right side
         Position {
-            x: self.width as u16,
+            x: self.width as u16 - LNO_SHIFT ,
             y: self.height as u16 - 2,
         }
     }
