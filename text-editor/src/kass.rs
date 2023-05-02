@@ -486,7 +486,7 @@ impl Kass {
         self.statusbar
             .paint(self.mode.clone(), self.absolute_path.clone())?;
         self.screen
-            .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize)?;
+            .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize, self.cursor.y as usize)?;
 
         self.screen
             .move_to(&self.cursor, self.rowoff, self.coloff)?;

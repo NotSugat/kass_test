@@ -4,8 +4,9 @@ use crossterm::{
     style::{Attribute, Print, SetAttribute},
     terminal, QueueableCommand,
 };
-use std::{io::{stdout, Result, Write}, env::current_exe};
+use std::{io::{stdout, Result, Write}, env::current_exe, cmp::Ordering};
 use text_editor::Position;
+
 
 #[derive(Debug, Clone)]
 pub struct Screen {
@@ -30,7 +31,7 @@ impl Screen {
         })
     }
 
-    pub fn draw_screen(&mut self, rows: &[Row], rowoff: usize, coloff: usize) -> Result<()> {
+    pub fn draw_screen(&mut self, rows: &[Row], rowoff: usize, coloff: usize, cursor_at: usize) -> Result<()> {
         for i in 0..(self.height - 2) {
             let row = i + rowoff;
             if row >= rows.len() {
@@ -43,11 +44,28 @@ impl Screen {
                 len -= coloff;
                 let start = coloff;
                 let end = start + if len >= (self.width - (LNO_SHIFT as usize) ){ self.width - (LNO_SHIFT) as usize} else { len };
+                
+            // Displays the relative line number
+               let line_Order = cursor_at.cmp(&row);
 
+                let relative_LN = match line_Order
+                 {
+                    Ordering::Equal => row + 1,
+                    Ordering::Greater => cursor_at - row,
+                    Ordering::Less => row - cursor_at,
+                }; 
                 stdout()
-                    // .queue(SetAttribute(Attribute::Reset))?
+                    .queue(SetAttribute(Attribute::Reset))?
                     .queue(cursor::MoveTo(0, i as u16 ))?
-                    .queue(Print(format!("{:3}", row + 1)))?
+                    .queue(
+                        if line_Order == Ordering::Equal{
+
+                        Print(format!("{:<4}", relative_LN))
+                        }
+                        else {
+                            Print(format!("{:4}", relative_LN))
+                        }
+                    )?
                     .queue(cursor::MoveTo(LNO_SHIFT, i as u16))?
                     .queue(Print(rows[row].chars[start..end].to_string()))?;
             }
