@@ -351,7 +351,6 @@ impl Kass {
                     self.normal_mode = NormalMode::Default;
                 }
             },
-
             NormalMode::Copy => match self.key_event {
                 KeyEvent {
                     code: KeyCode::Char('y'),
@@ -360,6 +359,10 @@ impl Kass {
                 } => {
                     if self.rows.len() != 0 {
                         self.clipboard[0] = self.rows[self.cursor.y as usize].chars.clone();
+                    }
+
+                    if self.clipboard.len() > 1 {
+                        self.clipboard.remove(1);
                     }
 
                     self.cursor.y = if self.cursor.above(self.rows.len()) || self.rows.len() == 0 {
@@ -371,14 +374,39 @@ impl Kass {
                     self.normal_mode = NormalMode::Default;
                 }
                 KeyEvent {
-                    code: KeyCode::Char('k'),
+                    code: KeyCode::Char('j'),
                     modifiers: KeyModifiers::NONE,
                     ..
                 } => {
                     if self.cursor.above(self.rows.len()) {
                         self.clipboard[0] = self.rows[self.cursor.y as usize].chars.clone();
-                        self.clipboard[1]
-                            .push_str(self.rows[self.cursor.y as usize + 1].chars.clone().as_str());
+
+                        if self.clipboard.len() > 1 {
+                            self.clipboard.remove(1);
+                        }
+
+                        self.clipboard
+                            .push(self.rows[self.cursor.y as usize + 1].chars.clone());
+
+                        self.refresh_screen()?;
+                    }
+
+                    self.normal_mode = NormalMode::Default;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('k'),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    if self.cursor.above(self.rows.len()) && self.cursor.y > 0 {
+                        self.clipboard[0] = self.rows[self.cursor.y as usize - 1].chars.clone();
+
+                        if self.clipboard.len() > 1 {
+                            self.clipboard.remove(1);
+                        }
+
+                        self.clipboard
+                            .push(self.rows[self.cursor.y as usize].chars.clone());
 
                         self.refresh_screen()?;
                     }
