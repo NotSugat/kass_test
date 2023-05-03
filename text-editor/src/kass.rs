@@ -51,7 +51,7 @@ pub struct Kass {
     number_display: bool,
 
     normal_mode: NormalMode,
-    clipboard: String,
+    clipboard: Vec<String>,
 
     terminal_width: usize,
     terminal_height: usize,
@@ -110,7 +110,7 @@ impl Kass {
 
             number_display: false,
 
-            clipboard: String::new(),
+            clipboard: vec!["".to_string()],
             normal_mode: NormalMode::Default,
             terminal_height: height,
             terminal_width: width,
@@ -264,8 +264,7 @@ impl Kass {
                     'd' => self.normal_mode = NormalMode::Cut,
                     'y' => self.normal_mode = NormalMode::Copy,
                     'p' => {
-                        self.rows[self.cursor.y as usize]
-                            .paste(self.cursor.x as usize, self.clipboard.clone());
+                        self.paste();
                         self.refresh_screen()?;
                     }
                     _ => {}
@@ -286,8 +285,12 @@ impl Kass {
                     ..
                 } => {
                     if self.rows.len() != 0 {
-                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
+                        self.clipboard[0] = self.rows[self.cursor.y as usize].chars.clone();
                         self.rows.remove(self.cursor.y as usize);
+                    }
+
+                    if self.clipboard.len() > 1 {
+                        self.clipboard.remove(1);
                     }
 
                     self.cursor.y = if self.cursor.above(self.rows.len()) || self.rows.len() == 0 {
@@ -299,18 +302,46 @@ impl Kass {
                     self.normal_mode = NormalMode::Default;
                 }
                 KeyEvent {
-                    code: KeyCode::Char('k'),
+                    code: KeyCode::Char('j'),
                     modifiers: KeyModifiers::NONE,
                     ..
                 } => {
                     if self.cursor.above(self.rows.len()) {
-                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
-                        self.clipboard.push('\n');
+                        self.clipboard[0] = self.rows[self.cursor.y as usize].chars.clone();
+
+                        if self.clipboard.len() > 1 {
+                            self.clipboard.remove(1);
+                        }
+
                         self.clipboard
-                            .push_str(self.rows[self.cursor.y as usize + 1].chars.clone().as_str());
+                            .push(self.rows[self.cursor.y as usize + 1].chars.clone());
 
                         self.rows.remove(self.cursor.y as usize);
                         self.rows.remove(self.cursor.y as usize);
+                        self.refresh_screen()?;
+                    }
+
+                    self.normal_mode = NormalMode::Default;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('k'),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    if self.cursor.above(self.rows.len()) && self.cursor.y > 0 {
+                        self.clipboard[0] = self.rows[self.cursor.y as usize - 1].chars.clone();
+
+                        if self.clipboard.len() > 1 {
+                            self.clipboard.remove(1);
+                        }
+
+                        self.clipboard
+                            .push(self.rows[self.cursor.y as usize].chars.clone());
+
+                        self.rows.remove(self.cursor.y as usize);
+                        self.rows.remove(self.cursor.y as usize - 1);
+
+                        self.cursor.y -= 1;
                         self.refresh_screen()?;
                     }
 
@@ -328,7 +359,7 @@ impl Kass {
                     ..
                 } => {
                     if self.rows.len() != 0 {
-                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
+                        self.clipboard[0] = self.rows[self.cursor.y as usize].chars.clone();
                     }
 
                     self.cursor.y = if self.cursor.above(self.rows.len()) || self.rows.len() == 0 {
@@ -345,9 +376,8 @@ impl Kass {
                     ..
                 } => {
                     if self.cursor.above(self.rows.len()) {
-                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
-                        self.clipboard.push('\n');
-                        self.clipboard
+                        self.clipboard[0] = self.rows[self.cursor.y as usize].chars.clone();
+                        self.clipboard[1]
                             .push_str(self.rows[self.cursor.y as usize + 1].chars.clone().as_str());
 
                         self.refresh_screen()?;
@@ -646,6 +676,20 @@ impl Kass {
             return;
         }
         self.rows.insert(idx, Row::new(row_content));
+    }
+
+    pub fn paste(&mut self) {
+        if self.clipboard.len() > 1 {
+            for row in 0..self.clipboard.len() as usize {
+                self.insert_row(
+                    self.cursor.y as usize + 1 + row,
+                    self.clipboard[row].clone(),
+                )
+            }
+        } else {
+            self.rows[self.cursor.y as usize]
+                .append_char(self.cursor.x as usize, self.clipboard[0].clone())
+        }
     }
 
     fn goto_newline(&mut self) -> Result<()> {
