@@ -29,7 +29,6 @@ pub struct Kass {
 
     // status_message: String,
     // status_time: Instant,
-
     quit_kass: bool,
 
     // text: String,
@@ -50,6 +49,9 @@ pub struct Kass {
     cursor: Position,
 
     number_display: bool,
+
+    normal_mode: NormalMode,
+    clipboard: String,
 
     terminal_width: usize,
     terminal_height: usize,
@@ -107,6 +109,9 @@ impl Kass {
             cursor: Position::default(),
 
             number_display: false,
+
+            clipboard: String::new(),
+            normal_mode: NormalMode::Default,
             terminal_height: height,
             terminal_width: width,
         })
@@ -244,25 +249,115 @@ impl Kass {
     }
 
     fn handle_normal_mode(&mut self) -> Result<()> {
-        match self.key_event {
-            KeyEvent {
-                code: KeyCode::Char(key),
-                modifiers: KeyModifiers::NONE,
-                ..
-            } => match key {
-                'h' => self.move_cursor(MovementKey::Left),
-                'l' => self.move_cursor(MovementKey::Right),
-                'j' => self.move_cursor(MovementKey::Down),
-                'k' => self.move_cursor(MovementKey::Up),
-                _ => {}
-            },
-            KeyEvent { code, .. } => match code {
-                KeyCode::Left => self.move_cursor(MovementKey::Left),
-                KeyCode::Right => self.move_cursor(MovementKey::Right),
-                KeyCode::Down => self.move_cursor(MovementKey::Down),
-                KeyCode::Up => self.move_cursor(MovementKey::Up),
+        match self.normal_mode {
+            NormalMode::Default => match self.key_event {
+                KeyEvent {
+                    code: KeyCode::Char(key),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => match key {
+                    'h' => self.move_cursor(MovementKey::Left),
+                    'l' => self.move_cursor(MovementKey::Right),
+                    'j' => self.move_cursor(MovementKey::Down),
+                    'k' => self.move_cursor(MovementKey::Up),
 
-                _ => {}
+                    'd' => self.normal_mode = NormalMode::Cut,
+                    'y' => self.normal_mode = NormalMode::Copy,
+                    'p' => {
+                        self.rows[self.cursor.y as usize]
+                            .paste(self.cursor.x as usize, self.clipboard.clone());
+                        self.refresh_screen()?;
+                    }
+                    _ => {}
+                },
+                KeyEvent { code, .. } => match code {
+                    KeyCode::Left => self.move_cursor(MovementKey::Left),
+                    KeyCode::Right => self.move_cursor(MovementKey::Right),
+                    KeyCode::Down => self.move_cursor(MovementKey::Down),
+                    KeyCode::Up => self.move_cursor(MovementKey::Up),
+
+                    _ => {}
+                },
+            },
+            NormalMode::Cut => match self.key_event {
+                KeyEvent {
+                    code: KeyCode::Char('d'),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    if self.rows.len() != 0 {
+                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
+                        self.rows.remove(self.cursor.y as usize);
+                    }
+
+                    self.cursor.y = if self.cursor.above(self.rows.len()) || self.rows.len() == 0 {
+                        self.cursor.y
+                    } else {
+                        self.cursor.y - 1
+                    };
+                    self.refresh_screen()?;
+                    self.normal_mode = NormalMode::Default;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('k'),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    if self.cursor.above(self.rows.len()) {
+                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
+                        self.clipboard.push('\n');
+                        self.clipboard
+                            .push_str(self.rows[self.cursor.y as usize + 1].chars.clone().as_str());
+
+                        self.rows.remove(self.cursor.y as usize);
+                        self.rows.remove(self.cursor.y as usize);
+                        self.refresh_screen()?;
+                    }
+
+                    self.normal_mode = NormalMode::Default;
+                }
+                _ => {
+                    self.normal_mode = NormalMode::Default;
+                }
+            },
+
+            NormalMode::Copy => match self.key_event {
+                KeyEvent {
+                    code: KeyCode::Char('y'),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    if self.rows.len() != 0 {
+                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
+                    }
+
+                    self.cursor.y = if self.cursor.above(self.rows.len()) || self.rows.len() == 0 {
+                        self.cursor.y
+                    } else {
+                        self.cursor.y - 1
+                    };
+                    self.refresh_screen()?;
+                    self.normal_mode = NormalMode::Default;
+                }
+                KeyEvent {
+                    code: KeyCode::Char('k'),
+                    modifiers: KeyModifiers::NONE,
+                    ..
+                } => {
+                    if self.cursor.above(self.rows.len()) {
+                        self.clipboard = self.rows[self.cursor.y as usize].chars.clone();
+                        self.clipboard.push('\n');
+                        self.clipboard
+                            .push_str(self.rows[self.cursor.y as usize + 1].chars.clone().as_str());
+
+                        self.refresh_screen()?;
+                    }
+
+                    self.normal_mode = NormalMode::Default;
+                }
+                _ => {
+                    self.normal_mode = NormalMode::Default;
+                }
             },
         }
         Ok(())
@@ -310,7 +405,8 @@ impl Kass {
         // compare length of the row and cursor x position and gives min value between them
         self.cursor.x = self.cursor.x.min(rowlen);
 
-        self.refresh_screen().expect("not working refresh screen in move cursor function");
+        self.refresh_screen()
+            .expect("not working refresh screen in move cursor function");
     }
 
     fn scroll(&mut self) -> Result<()> {
@@ -379,15 +475,14 @@ impl Kass {
             } => {
                 self.move_cursor(MovementKey::Down);
             }
-            KeyEvent{
+            KeyEvent {
                 code: KeyCode::Tab,
                 modifiers: KeyModifiers::NONE,
                 ..
-            }=>
-            {
+            } => {
                 self.insert_char('\t');
                 self.refresh_screen()?;
-                
+
                 // cursor::MoveTo(self.cursor.x + 4, self.cursor.y);
                 // cursor::MoveToColumn(self.cursor.x);
             }
@@ -420,13 +515,11 @@ impl Kass {
                 // modifiers: KeyModifiers::NONE,
                 ..
             } => {
-               
-                    self.move_cursor(MovementKey::Left);
+                self.move_cursor(MovementKey::Left);
 
                 self.del_char();
             }
 
-            
             KeyEvent {
                 code: KeyCode::Enter,
                 ..
@@ -485,13 +578,16 @@ impl Kass {
 
         self.statusbar
             .paint(self.mode.clone(), self.absolute_path.clone())?;
-        self.screen
-            .draw_screen(&self.rows, self.rowoff as usize, self.coloff as usize, self.cursor.y as usize)?;
+        self.screen.draw_screen(
+            &self.rows,
+            self.rowoff as usize,
+            self.coloff as usize,
+            self.cursor.y as usize,
+        )?;
 
         self.screen
             .move_to(&self.cursor, self.rowoff, self.coloff)?;
-        
-        
+
         stdout().flush()?;
 
         Ok(())
@@ -567,6 +663,12 @@ impl Kass {
         Ok(())
     }
 
+    // copy and paste functions
+    // fn copy(&mut self) -> Result<()> {
+    //     match
+    //     Ok(())
+    // }
+
     // handling deletion of character
 
     fn del_char(&mut self) {
@@ -604,13 +706,12 @@ impl Kass {
     //         Some(self.rows.remove(row_idx).chars)
     //     }
     // }
-    
-    // prints messages on saving; 
 
-//     fn set_message<T: Into<String>>(&mut self, T)
-//     {
-//         self.status_time = Instant::now();
-//         self.status_message = message.into();
-//     }
+    // prints messages on saving;
+
+    //     fn set_message<T: Into<String>>(&mut self, T)
+    //     {
+    //         self.status_time = Instant::now();
+    //         self.status_message = message.into();
+    //     }
 }
-

@@ -6,6 +6,13 @@ pub struct Position {
     pub y: u16,
 }
 
+#[derive(Debug, Clone)]
+pub enum NormalMode {
+    Default,
+    Cut,
+    Copy,
+}
+
 impl Position {
     pub fn new(position_x: u16, position_y: u16) -> Result<Position> {
         Ok(Position {

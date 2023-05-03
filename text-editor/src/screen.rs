@@ -4,9 +4,12 @@ use crossterm::{
     style::{Attribute, Print, SetAttribute},
     terminal, QueueableCommand,
 };
-use std::{io::{stdout, Result, Write}, env::current_exe, cmp::Ordering};
+use std::{
+    cmp::Ordering,
+    env::current_exe,
+    io::{stdout, Result, Write},
+};
 use text_editor::Position;
-
 
 #[derive(Debug, Clone)]
 pub struct Screen {
@@ -31,7 +34,13 @@ impl Screen {
         })
     }
 
-    pub fn draw_screen(&mut self, rows: &[Row], rowoff: usize, coloff: usize, cursor_at: usize) -> Result<()> {
+    pub fn draw_screen(
+        &mut self,
+        rows: &[Row],
+        rowoff: usize,
+        coloff: usize,
+        cursor_at: usize,
+    ) -> Result<()> {
         for i in 0..(self.height - 2) {
             let row = i + rowoff;
             if row >= rows.len() {
@@ -43,29 +52,29 @@ impl Screen {
                 }
                 len -= coloff;
                 let start = coloff;
-                let end = start + if len >= (self.width - (LNO_SHIFT as usize) ){ self.width - (LNO_SHIFT) as usize} else { len };
-                
-            // Displays the relative line number
-               let line_Order = cursor_at.cmp(&row);
+                let end = start
+                    + if len >= (self.width - (LNO_SHIFT as usize)) {
+                        self.width - (LNO_SHIFT) as usize
+                    } else {
+                        len
+                    };
 
-                let relative_LN = match line_Order
-                 {
+                // Displays the relative line number
+                let line_order = cursor_at.cmp(&row);
+
+                let relative_ln = match line_order {
                     Ordering::Equal => row + 1,
                     Ordering::Greater => cursor_at - row,
                     Ordering::Less => row - cursor_at,
-                }; 
+                };
                 stdout()
                     .queue(SetAttribute(Attribute::Reset))?
-                    .queue(cursor::MoveTo(0, i as u16 ))?
-                    .queue(
-                        if line_Order == Ordering::Equal{
-
-                        Print(format!("{:<4}", relative_LN))
-                        }
-                        else {
-                            Print(format!("{:4}", relative_LN))
-                        }
-                    )?
+                    .queue(cursor::MoveTo(0, i as u16))?
+                    .queue(if line_order == Ordering::Equal {
+                        Print(format!("{:<4}", relative_ln))
+                    } else {
+                        Print(format!("{:4}", relative_ln))
+                    })?
                     .queue(cursor::MoveTo(LNO_SHIFT, i as u16))?
                     .queue(Print(rows[row].chars[start..end].to_string()))?;
             }
@@ -96,7 +105,7 @@ impl Screen {
     pub fn boundary(&self) -> Position {
         // minus 2 because of the scroll bar at the right side
         Position {
-            x: self.width as u16 - LNO_SHIFT ,
+            x: self.width as u16 - LNO_SHIFT,
             y: self.height as u16 - 2,
         }
     }

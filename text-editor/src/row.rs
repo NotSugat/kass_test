@@ -19,6 +19,10 @@ impl Row {
         self.chars.len()
     }
 
+    pub fn paste(&mut self, position_x: usize, clipboard: String) {
+        self.chars.insert_str(position_x, clipboard.as_str());
+    }
+
     pub fn insert_char(&mut self, at: usize, c: char) {
         if at >= self.chars.len() {
             self.chars.push(c);
