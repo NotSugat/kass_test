@@ -2,7 +2,9 @@ use super::mode::*;
 use super::row::*;
 use super::screen::*;
 use super::statusbar::*;
+// use super::lib::*;
 
+use crossterm::cursor::SetCursorStyle;
 use crossterm::style::Print;
 use crossterm::QueueableCommand;
 use crossterm::{
@@ -182,6 +184,13 @@ impl Kass {
                     self.mode_changed = true;
                     self.mode = "Insert".to_string();
                     self.refresh_screen()?;
+                     execute!(
+                        stdout(),
+                        SetCursorStyle::BlinkingBar,
+
+                    )?; 
+                    
+                     
                 }
                 KeyEvent {
                     code: KeyCode::Char('a'),
@@ -240,6 +249,11 @@ impl Kass {
                     self.mode_changed = true;
                     self.mode = "Normal".to_string();
                     self.refresh_screen()?;
+                    execute!(
+                        stdout(),
+                        SetCursorStyle::DefaultUserShape,
+
+                    )?; 
                 }
                 _ => self.mode_changed = false,
             },
@@ -492,7 +506,7 @@ impl Kass {
 
     // handle insert mode
     fn handle_insert_mode(&mut self) -> Result<()> {
-        match self.key_event {
+               match self.key_event {
             KeyEvent {
                 code: KeyCode::Backspace,
                 modifiers: KeyModifiers::NONE,
@@ -552,7 +566,7 @@ impl Kass {
                 }
             }
         }
-
+        
         self.mode_changed = false;
 
         Ok(())
